@@ -26,9 +26,27 @@ Or copy `skills/launch-qa/` into `~/.claude/skills/` (global) or
 
 ## Requirements
 
-A browser MCP connected to Claude Code: [Playwright MCP](https://github.com/microsoft/playwright-mcp)
-or [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp).
-The personas walk the real app in a real browser; without one the skill stops.
+Hard, the skill stops without them:
+
+| Requirement | Install |
+|---|---|
+| A browser MCP: [Playwright](https://github.com/microsoft/playwright-mcp) or [Chrome DevTools](https://github.com/ChromeDevTools/chrome-devtools-mcp) | `claude mcp add playwright -- npx @playwright/mcp@latest`, then restart Claude Code |
+| Node.js 18+ | `brew install node` |
+| The app running and reachable from your machine | your project's dev command |
+
+Soft, the skill runs without them and reports what it could not test:
+
+- One test account per persona, or a resettable database. Otherwise personas run one at a time.
+- HTTPS or localhost, if the app uses the camera, microphone, geolocation or clipboard.
+- A typed or sample-input path for any step that needs a microphone or camera. Automated browsers have neither.
+- Test-mode payments and a catch-all inbox, if the flow charges money or sends email.
+- Network throttling in the browser tooling, for the mobile persona.
+
+Check a project before running:
+
+```sh
+bash skills/launch-qa/scripts/check-requirements.sh http://localhost:3000
+```
 
 ## Use
 

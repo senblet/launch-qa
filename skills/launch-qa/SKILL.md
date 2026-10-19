@@ -7,9 +7,43 @@ description: Pre-launch QA with simulated first-time users. Use when the user sa
 
 Your first 100 real users will not tell you why they left. These six will.
 
-You are the launch QA lead. The app under test must be running and reachable in a
-real browser. A browser MCP (Playwright or Chrome DevTools) is required; if none is
-connected, say so and stop. Do not simulate the walkthrough from reading the code.
+You are the launch QA lead. Do not simulate the walkthrough from reading the code.
+
+## Requirements
+
+Hard requirements. If any is missing, report it with its fix and stop:
+
+- **A browser MCP** connected to this session: Playwright or Chrome DevTools. Check
+  the session's tool list, not just the config; a server added mid-session needs a
+  restart before its tools exist. Fix:
+  `claude mcp add playwright -- npx @playwright/mcp@latest`, then restart.
+- **Node.js 18+**, which both browser MCPs run on.
+- **The app running** and reachable at a URL from this machine.
+
+Soft requirements. If any is missing, continue, and every persona report names
+what it could not test because of it:
+
+- **Isolated test data.** A way to create one account per persona, or a database
+  that can be reset. Without it, run personas one after another instead of in
+  parallel.
+- **A secure context** (HTTPS or localhost) when the app uses the camera,
+  microphone, geolocation or clipboard. Browsers block those APIs elsewhere.
+- **A non-hardware path for hardware inputs.** Automated browsers have no real
+  microphone or camera. Chromium's fake devices give `getUserMedia` a stream, but
+  speech recognition on that stream usually returns nothing. Look for a typed or
+  sample-input path in the app and use it; report the hardware step itself as
+  untested.
+- **Sandboxed side effects.** Payments in test mode, email to a catch-all inbox,
+  paid third-party APIs the user has agreed to pay for. Ask before running if the
+  flow charges money or messages real people.
+- **Network throttling** in the browser tooling, for the mobile persona.
+
+Run the bundled check first; it covers the hard requirements and the secure
+context:
+
+```sh
+bash <this skill's directory>/scripts/check-requirements.sh <app-url>
+```
 
 ## Phase 0: preflight
 
@@ -29,9 +63,10 @@ Do this yourself, before spawning anyone.
    another's session, and the breaker's duplicate submits pollute the skeptic's
    view. If the app has one shared backend state, run the breaker after the others
    finish, or against a separate database.
-4. **Check what the browser tooling can do.** Viewport resizing is always available.
-   Network throttling often is not. Record what is available so persona reports
-   say what was actually tested instead of claiming a 3G run that never happened.
+4. **Record what cannot be tested.** From the soft requirements: no throttling, no
+   real microphone or camera, shared data, side effects skipped. Hand that list to
+   every persona so its report says what was actually tested instead of claiming
+   a 3G run or a voice recording that never happened.
 
 ## Phase 1: first-time users
 
