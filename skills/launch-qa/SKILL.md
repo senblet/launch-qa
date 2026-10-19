@@ -1,46 +1,63 @@
 ---
 name: launch-qa
-description: Pre-launch QA with five simulated first-time users. Use when the user says "launch QA", "test as first users", "simulate users before launch", "/launch-qa", or asks to find what confuses or blocks new users of a web app before shipping. Spins up five subagent personas that each walk the real app in a browser from landing page to first success, merges their findings into one ranked list, fixes everything in one pass, and reruns the personas to prove the fixes.
+description: Pre-launch QA with simulated first-time users. Use when the user says "launch QA", "test as first users", "simulate users before launch", "QA de lanzamiento", "prueba como primeros usuarios", "test come primi utenti", "/launch-qa", or asks to find what confuses or blocks new users of a web app before shipping. Spawns subagent personas that each walk the real app in a browser from landing page to first success, merges their findings into one ranked list, fixes bugs, proposes product changes, and reruns the personas to prove the fixes.
 ---
 
 # Launch QA
 
-Your first 100 real users will not tell you why they left. These five will.
+Your first 100 real users will not tell you why they left. These six will.
 
 You are the launch QA lead. The app under test must be running and reachable in a
 real browser. A browser MCP (Playwright or Chrome DevTools) is required; if none is
 connected, say so and stop. Do not simulate the walkthrough from reading the code.
 
-## Inputs
+## Phase 0: preflight
 
-Establish these before spawning anyone. Ask only for what you cannot infer:
+Do this yourself, before spawning anyone.
 
-- **URL** of the running app (local or deployed).
-- **First success**: the one action that means a new user got value (signed up and
-  created the first X, completed the first Y). If the user does not say, propose one
-  and confirm.
-- **Credentials or test data** if the flow needs them.
+1. **Inputs.** Get the URL of the running app and the definition of **first
+   success**: the one action that means a new user got value (signed up and created
+   the first X, completed the first Y). If the user does not say, propose one and
+   confirm. Get credentials or test data if the flow needs them.
+2. **Walk the happy path once.** Open the app in the browser and go from landing
+   page to first success the intended way. Write down the steps as a numbered list
+   with the URL and the control used at each step. This list is what the personas
+   deviate from; without it the impatient persona quits at the landing page and
+   reports nothing.
+3. **Isolate the personas.** Each persona needs its own browser context and its own
+   account or test data. Shared sessions collide: one persona's logout kills
+   another's session, and the breaker's duplicate submits pollute the skeptic's
+   view. If the app has one shared backend state, run the breaker after the others
+   finish, or against a separate database.
+4. **Check what the browser tooling can do.** Viewport resizing is always available.
+   Network throttling often is not. Record what is available so persona reports
+   say what was actually tested instead of claiming a 3G run that never happened.
 
-## Phase 1: five first-time users
+## Phase 1: first-time users
 
-Spawn five subagents in parallel, one per persona. Each gets the URL, the definition
-of first success, the browser tooling, and the persona brief below. Each walks from
-the landing page to first success and screenshots every moment of confusion, friction
-or breakage. Each returns a list of findings, not a narrative.
+Spawn the personas in parallel, one subagent each. Each gets the URL, the first
+success definition, the happy path steps, its own credentials, the browser tooling
+notes and its persona brief. Each walks from the landing page to first success and
+screenshots every moment of confusion, friction or breakage. Each stops at first
+success; the job is to reach it the way that persona would, not to explore the app.
+Each returns a list of findings, not a narrative.
 
 ### Persona briefs
 
 1. **The impatient one.** Skims, never reads a paragraph, clicks the first button
    that looks right, quits at the first error or spinner longer than 3 seconds.
-   Records the exact moment they would have left.
+   Records the exact moment they would have left, then keeps going so the rest of
+   the flow is covered, marking everything after that point as "would not have
+   seen this".
 2. **The skeptic.** Reads pricing, terms and privacy before signing up. Looks for
    what the product costs, what happens to their data, how to cancel, who is behind
    it. Records every unanswered question and every claim that cannot be verified
    from the site.
-3. **The mobile user.** Does everything on a 375px wide viewport with slow 3G
-   throttling. Records overflow, unreachable buttons, tap targets under 44px, layout
-   shifts, anything that needs a hover, and anything that takes longer than 10
-   seconds to become usable.
+3. **The mobile user.** Does everything on a 375px wide viewport. Throttles to slow
+   3G when the tooling allows it and says so in the report either way. Records
+   overflow, unreachable buttons, tap targets under 44px, layout shifts, anything
+   that needs a hover, and anything that takes longer than 10 seconds to become
+   usable.
 4. **The non-native speaker.** Follows only what the UI literally says. Takes every
    label, button and error message at face value, with no idioms, no jargon, no
    inference from context. Records every place the literal reading leads the wrong
@@ -49,15 +66,21 @@ or breakage. Each returns a list of findings, not a narrative.
    HTML, SQL, negative numbers, future dates), hits the browser back button
    mid-flow, double-clicks every submit, refreshes on every step, opens the same
    flow in two tabs. Records every crash, duplicate, lost state or unhelpful error.
+6. **The returning user.** Reaches first success once, closes the browser, comes
+   back the next day (new context, same account, cookies kept). Records whether
+   the app remembers who they are and where they were, whether what they created
+   is still there, and whether the second visit lands on something useful or on
+   the onboarding again.
 
 ### Finding format
 
 Every finding from every persona uses the same shape so they can be merged:
 
 ```
-- step: <where in the flow, e.g. "signup form, after submit">
+- step: <happy path step number, or "off path: <where>">
   what: <one sentence, what the user saw or could not do>
   severity: blocker | friction | confusion
+  kind: bug | copy | flow
   screenshot: <path>
   expected: <what the persona expected to happen>
 ```
@@ -65,38 +88,50 @@ Every finding from every persona uses the same shape so they can be merged:
 `blocker` means the persona could not reach first success. `friction` means they
 could but would be annoyed. `confusion` means they had to guess.
 
+`bug` means the app did something wrong (error, crash, lost data, broken layout).
+`copy` means the words were the problem. `flow` means the steps were the problem.
+
 ## Phase 2: merge and rank
 
-Merge the five lists into one. Two findings are the same issue when they point at
-the same step and the same cause, even if the personas describe them differently.
+Merge the lists into one. Two findings are the same issue when they point at the
+same step and the same cause, even if the personas describe them differently.
 Rank by:
 
-1. How many of the five personas hit it.
-2. Severity (blocker first).
-3. How early in the flow it appears.
+1. Severity: blocker, then friction, then confusion.
+2. Within a severity, how many personas hit it.
+3. Within that, how early in the flow it appears.
 
-Present the ranked list to the user with the persona count and screenshots per
-item before touching code. The ranked list is the deliverable of this phase.
+Severity comes before count on purpose. A broken signup and a slightly off font can
+both hit six of six; only one of them loses the user.
 
-## Phase 3: fix in one pass
+Present the ranked list to the user with severity, kind, persona count and
+screenshots per item. The ranked list is the deliverable of this phase.
 
-Fix every item on the list, in rank order, in a single pass. Do not stop to ask
-about items that have an obvious fix. Ask only when a fix would change product
-behaviour the user might not want (removing a step, changing pricing copy, adding
-a field). Run the project's own tests and lint after the pass.
+## Phase 3: fix and propose
+
+Split the list by kind.
+
+- **Bugs**: fix every one in a single pass, in rank order, without asking. Run the
+  project's own tests and lint after the pass.
+- **Copy and flow**: do not change them unasked. The lead did not build this
+  product and does not know which confirmation step is legally required or which
+  pricing sentence was negotiated. Present each as a one-line proposal with the
+  concrete change, let the user approve or strike items, then apply the approved
+  ones in a second pass.
 
 ## Phase 4: rerun
 
-Spawn the same five personas again against the fixed app with the same briefs.
-Each one reports which items from the ranked list they can no longer reproduce and
-any new issues the fixes introduced. The result is a table:
+Spawn the same personas again against the fixed app with the same briefs, fresh
+contexts and fresh accounts. Each reports which items from the ranked list it can
+no longer reproduce and any new issues the fixes introduced. The result is a table:
 
 ```
-| # | issue | hit before | hit after | status |
+| # | issue | severity | kind | hit before | hit after | status |
 ```
 
 An item is fixed only when zero personas reproduce it. Anything still reproduced
-goes back to Phase 3. Report the final table and stop.
+goes back to Phase 3. Items the user struck in Phase 3 are listed as "declined",
+not as fixed. Report the final table and stop.
 
 ## Rules
 
@@ -104,4 +139,6 @@ goes back to Phase 3. Report the final table and stop.
   a finding.
 - Personas report what they saw, not what the code does. Keep code reading out of
   Phase 1.
+- A persona says what it could not test (no throttling, no second tab) instead of
+  reporting as if it had.
 - Never mark something fixed on inspection. Only the rerun marks things fixed.
